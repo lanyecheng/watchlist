@@ -3,8 +3,9 @@
 
 import os
 import sys
+
 import click
-from flask import Flask, escape, url_for, render_template
+from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 
 WIN = sys.platform.startswith('win')
@@ -72,27 +73,19 @@ class Movie(db.Model):
 
 @app.route('/')
 def index():
-    user = User.query.first()
     movies = Movie.query.all()
-    return render_template('index.html', user=user, movies=movies)
+    return render_template('index.html', movies=movies)
 
 
-@app.route('/user/<name>')
-def user_page(name):
-    return 'User: %s' % escape(name)
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
 
 
-@app.route('/test')
-def test_url_for():
-    # 下面是一些调用命令（请在命令行窗口查看输出的 URL）
-    print(url_for('hello_world'))
-
-    print(url_for('user_page', name='lanye'))
-    print(url_for('user_page', name='peter'))
-    print(url_for('test_url_for'))
-    # 下面这个调用传入了多余的关键字参数，它们会被作为查询字符串附加到 URL 后面。
-    print(url_for('test_url_for', num=2))
-    return 'Test Page'
+@app.context_processor
+def inject_user():
+    user = User.query.first()
+    return dict(user=user)
 
 
 if __name__ == '__main__':

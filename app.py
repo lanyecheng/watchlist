@@ -7,6 +7,7 @@ import sys
 import click
 from flask import Flask, render_template, url_for, request, flash, redirect
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 
 WIN = sys.platform.startswith('win')
 if WIN:
@@ -35,8 +36,6 @@ def initdb(drop):
 @app.cli.command()
 def forge():
     """Generate fake data."""
-    db.create_all()
-    name = 'Lan Yc'
     movies = [
         {'title': 'My Neighbor Totoro', 'year': '1988'},
         {'title': 'Dead Poets Society', 'year': '1989'},
@@ -50,9 +49,6 @@ def forge():
         {'title': 'The Pork of Music', 'year': '2012'},
     ]
 
-    user = User(name=name)
-    db.session.add(user)
-
     for m in movies:
         movie = Movie(title=m['title'], year=m['year'])
         db.session.add(movie)
@@ -61,9 +57,36 @@ def forge():
     click.echo('Done.')
 
 
+@app.cli.command()
+@click.option('--username', prompt=True, help='The username used to login.')
+@click.option('--password', prompt=True, hide_input=True, confirmation_prompt=True, help='The password used to login.')
+def admin(username, password):
+    user = User.query.first()
+    if user is not None:
+        click.echo('Updating user...')
+        user.username = username
+        user.set_password(password)  # 设置密码
+    else:
+        click.echo('Creating user...')
+        user = User(username=username, name='Admin')
+        user.set_password(password)  # 设置密码
+        db.session.add(user)
+
+    db.session.commit()  # 提交数据库会话
+    click.echo('Done.')
+
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)  # 主键
     name = db.Column(db.String(20))  # 名字
+    username = db.Column(db.String(20))  # 用户名
+    password_hash = db.Column(db.String(128))  # 密码散列值
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def validate_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 
 class Movie(db.Model):
@@ -132,6 +155,11 @@ def page_not_found(e):
 def inject_user():
     user = User.query.first()
     return dict(user=user)
+
+
+@app.route('/test')
+def test():
+    return render_template('test.html')
 
 
 if __name__ == '__main__':

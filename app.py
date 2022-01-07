@@ -6,6 +6,7 @@ import sys
 
 import click
 from flask import Flask, render_template, url_for, request, flash, redirect
+from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user, current_user
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -16,10 +17,20 @@ else:
     prefix = 'sqlite:////'
 
 app = Flask(__name__)
+login_manager = LoginManager(app)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = prefix + os.path.join(app.root_path, 'data.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # 关闭对模型修改的监控
 app.config['SECRET_KEY'] = 'dev'
 db = SQLAlchemy(app)  # 初始化扩展，传入程序实例
+
+login_manager.login_view = 'login'
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    user = User.query.get(int(user_id))
+    return user
 
 
 @app.cli.command()  # 注册为命令
@@ -68,7 +79,7 @@ def admin(username, password):
         user.set_password(password)  # 设置密码
     else:
         click.echo('Creating user...')
-        user = User(username=username, name='Admin')
+        user = User(name='Admin', username=username)
         user.set_password(password)  # 设置密码
         db.session.add(user)
 
@@ -76,7 +87,7 @@ def admin(username, password):
     click.echo('Done.')
 
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)  # 主键
     name = db.Column(db.String(20))  # 名字
     username = db.Column(db.String(20))  # 用户名
@@ -98,6 +109,8 @@ class Movie(db.Model):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
+        if not current_user.is_authenticated:
+            return redirect(url_for('index'))
         # 获取表单数据
         title = request.form.get('title')
         year = request.form.get('year')
@@ -117,6 +130,7 @@ def index():
 
 
 @app.route('/movie/edit/<int:movie_id>', methods=['GET', 'POST'])
+@login_required
 def edit(movie_id):
     # 点击 Edit → 跳转 edit.html 页面，通过 edit 函数获取当前相关数据记录，并展示
     # 使用 get_or_404() 方法，返回主键的记录，如果没有找到，则返回404错误相应
@@ -137,12 +151,65 @@ def edit(movie_id):
     return render_template('edit.html', movie=movie)
 
 
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    if request.method == 'POST':
+        name = request.form['name']
+
+        if not name or len(name) > 20:
+            flash('Invalid input.')
+            return redirect(url_for('settings'))
+
+        current_user.name = name
+        # current_user 会返回当前登录用户的数据库记录对象
+        # 等同于下面的用法
+        # user = User.query.first()
+        # user.name = name
+        db.session.commit()
+        flash('Settings updated.')
+        return redirect(url_for('index'))
+
+    return render_template('settings.html')
+
+
 @app.route('/movie/delete/<int:movie_id>', methods=['GET', 'POST'])
+@login_required
 def delete(movie_id):
     movie = Movie.query.get_or_404(movie_id)
     db.session.delete(movie)
     db.session.commit()
     flash('删除成功')
+    return redirect(url_for('index'))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        if not username or not password:
+            flash('Invalid input.')
+            return redirect(url_for('login'))
+
+        user = User.query.first()
+        if username == user.username and user.validate_password(password):
+            login_user(user)
+            flash('Login success.')
+            return redirect(url_for('index'))
+
+        flash('Invalid username or password.')
+        return redirect(url_for('login'))
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('Goodbye.')
     return redirect(url_for('index'))
 
 

@@ -2,11 +2,15 @@
 # -*- coding: utf-8 -*-
 # 视图函数
 
-from flask import render_template, request, url_for, redirect, flash
+from flask import render_template, request, url_for, redirect, flash, send_from_directory
 from flask_login import login_user, login_required, logout_user, current_user
-
+from os.path import join, exists, basename
+import arrow
 from watchlist import app, db
 from watchlist.models import User, Movie
+from watchlist.data_record import insert_record
+from xmind2case.xmind2htp import xmind_to_htp_preview, xmind_to_htp_xlsx_file
+from xmind2case.utils import get_xmind_testsuites
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -113,6 +117,57 @@ def logout():
     flash('Goodbye.')
     return redirect(url_for('index'))
 
+
 @app.route('/test')
 def test():
     return render_template('test.html')
+
+
+def allowed_file(filename):
+    return '.' in filename and \
+        filename.rsplit('.', 1)[1] in app.config['ALLOWED_EXTENSIONS']
+
+
+def save_file(file):
+    if file and allowed_file(file.filename):
+        filename = file.filename
+        upload_to = join(app.config['UPLOAD_FOLDER'], filename)
+        if exists(upload_to):
+            filename = '{}_{}.xmind'.format(filename[:-6], arrow.now().strftime('%Y%m%d_%H%M%S'))
+            upload_to = join(app.config['UPLOAD_FOLDER'], filename)
+
+        file.save(upload_to)
+        insert_record(filename)
+        return filename
+
+
+@app.route('/upload', methods=['GET', 'POST'])
+def upload():
+    filename = None
+    if request.method == 'POST':
+        file = request.files['file']
+        filename = save_file(file)
+    if filename:
+        return redirect(url_for('preview', filename=filename))
+    else:
+        return render_template('upload.html')
+
+
+@app.route('/preview/<filename>')
+def preview(filename):
+    full_path = join(app.config['UPLOAD_FOLDER'], filename)
+    testsuites = get_xmind_testsuites(full_path)
+    suite_count = 0
+    for suite in testsuites:
+        suite_count += len(suite.sub_suites)
+
+    testcases = xmind_to_htp_preview(full_path)
+    return render_template('preview.html', name=filename, suite=testcases, suite_count=suite_count)
+
+
+@app.route('/to/htp/<filename>')
+def download_xmind_htp(filename):
+    full_path = join(app.config['UPLOAD_FOLDER'], filename)
+    htp_file = xmind_to_htp_xlsx_file(full_path)
+    filename = basename(htp_file)
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)

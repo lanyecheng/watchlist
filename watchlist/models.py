@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from watchlist import db
 from datetime import datetime
 
+
 # 表名将会是 user（自动生成，小写处理）
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)  # 主键

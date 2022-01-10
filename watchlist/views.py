@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # 视图函数
-
-from flask import render_template, request, url_for, redirect, flash, send_from_directory
+import arrow
+import os
+from flask import render_template, request, url_for, redirect, flash, send_from_directory, g, abort
 from flask_login import login_user, login_required, logout_user, current_user
 from os.path import join, exists, basename
-import arrow
 from watchlist import app, db
 from watchlist.models import User, Movie
-from watchlist.data_record import insert_record
+from watchlist.data_record import insert_record, get_records, delete_record
 from xmind2case.xmind2htp import xmind_to_htp_preview, xmind_to_htp_xlsx_file
 from xmind2case.utils import get_xmind_testsuites
 
@@ -141,21 +141,38 @@ def save_file(file):
         return filename
 
 
+def delete_row(filename, record_id):
+    "数据库逻辑删除"
+    xmind_file = join(app.config['UPLOAD_FOLDER'], filename)
+    HTP_file = join(app.config['UPLOAD_FOLDER'], filename[:-5] + 'xls')
+    for f in [xmind_file, HTP_file]:
+        if exists(f):
+            os.remove(f)
+    delete_record(record_id)
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
-    filename = None
+    g.invalid_files = []
+    g.filename = None
+    g.error = None
+
     if request.method == 'POST':
         file = request.files['file']
-        filename = save_file(file)
-    if filename:
-        return redirect(url_for('preview', filename=filename))
+
+        g.filename = save_file(file)
+        # verify_uploaded_files([file])
+    if g.filename:
+        return redirect(url_for('preview', filename=g.filename))
     else:
-        return render_template('upload.html')
+        return render_template('upload.html', records=list(get_records()))
 
 
 @app.route('/preview/<filename>')
 def preview(filename):
     full_path = join(app.config['UPLOAD_FOLDER'], filename)
+    if not exists(full_path):
+        abort(404)
+
     testsuites = get_xmind_testsuites(full_path)
     suite_count = 0
     for suite in testsuites:
@@ -165,9 +182,21 @@ def preview(filename):
     return render_template('preview.html', name=filename, suite=testcases, suite_count=suite_count)
 
 
+@app.route('/delete_file/<filename>/<int:record_id>')
+def delete_file(filename, record_id):
+    full_path = join(app.config['UPLOAD_FOLDER'], filename)
+    if not exists(full_path):
+        abort(404)
+    else:
+        delete_row(filename, record_id)
+    return redirect(url_for('upload'))
+
+
 @app.route('/to/htp/<filename>')
 def download_xmind_htp(filename):
     full_path = join(app.config['UPLOAD_FOLDER'], filename)
+    if not exists(full_path):
+        abort(404)
     htp_file = xmind_to_htp_xlsx_file(full_path)
     filename = basename(htp_file)
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)

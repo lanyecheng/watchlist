@@ -11,8 +11,8 @@
 <div class="header">
     <h1>{{ name }} - Preview</h1>
     <h2>TestSuites: {{ suite_count }} / TestCases: {{ suite | length }}
-        / <a href="{{ url_for("download_xmind_htp",filename= name) }}">Get HTP xls</a>
-        / <a href="{{ url_for("index") }}">Go Back</a></h2>
+        / <a href="{{ url_for("download_xmind_htp",filename= name) }}">Get HTP XLS</a>
+        / <a href="{{ url_for("upload") }}">Go Back</a></h2>
 </div>
 <table class="pure-table tests-table">
     <thead>
@@ -44,10 +44,5 @@
     {% endfor %}
     </tbody>
 </table>
-<div class="footer">
-    <a href="{{ url_for('static', filename='guide/index.html') }}" target="_blank">User Guide</a> |
-    <a href="https://github.com/zhuifengshen/xmind2testcase/issues/new" target="_blank">Report Issue</a> |
-    Powered by <a href="https://github.com/zhuifengshen/xmind2testcase" target="_blank">XMind2TestCase</a>
-</div>
 </body>
 </html>

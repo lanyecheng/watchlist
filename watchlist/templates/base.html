@@ -20,7 +20,6 @@
     <nav>
         <ul>
             <li><a href="{{ url_for('index') }}">Home</a></li>
-            <li><a href="{{ url_for('test') }}">Test</a></li>
             <li><a href="{{ url_for('upload') }}">Upload</a></li>
             {% if current_user.is_authenticated %}
                 <li><a href="{{ url_for('settings') }}">Settings</a></li>

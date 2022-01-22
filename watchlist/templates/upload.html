@@ -39,7 +39,7 @@
                             <td>{{ record[2] }}</td>
                             <td>
                                 <a href="{{ url_for('preview',filename=record[1]) }}">PREVIEW</a> |
-                                <a href="{{ url_for("download_xmind_htp",filename= name) }}">Get HTP XLS</a> |
+                                <a href="{{ url_for("download_xmind_htp",filename=record[1]) }}">Get HTP XLS</a> |
                                 <a href="{{ url_for('delete_file',filename=record[1], record_id=record[4]) }}">DELETE</a>
                             </td>
                         </tr>

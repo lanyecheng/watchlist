@@ -142,13 +142,14 @@ def save_file(file):
 
 
 def delete_row(filename, record_id):
-    "数据库逻辑删除"
+    """数据库逻辑删除"""
     xmind_file = join(app.config['UPLOAD_FOLDER'], filename)
-    HTP_file = join(app.config['UPLOAD_FOLDER'], filename[:-5] + 'xls')
-    for f in [xmind_file, HTP_file]:
+    htp_file = join(app.config['UPLOAD_FOLDER'], filename[:-5] + 'xls')
+    for f in [xmind_file, htp_file]:
         if exists(f):
             os.remove(f)
     delete_record(record_id)
+
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
